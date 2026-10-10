@@ -1,0 +1,6 @@
+name: AICar
+icon: 🚗
+description: ELEGOO V4 motor shield with UNO Q local vision, roaming, object tracking and voice control.
+bricks:
+  - arduino:object_detection
+  - arduino:keyword_spotting

@@ -1,0 +1,2 @@
+# Arduino App Lab provides arduino, numpy, Pillow, and OpenCV.
+vosk==0.3.45
