@@ -1,6 +1,6 @@
 # Sources, provenance and licensing
 
-Research checked 2026-10-10. API/board support can evolve; the physical shield still needs inspection.
+Research checked 2026-10-10. API/board support can evolve; the physical L298N boards, power bank and USB hub still need inspection.
 
 ## ELEGOO reference
 
@@ -10,7 +10,7 @@ Research checked 2026-10-10. API/board support can evolve; the physical shield s
 - [`DeviceDriverSet.cpp`](https://github.com/elegooofficial/ELEGOO-Smart-Robot-Car-Kit-V4.0-New/blob/76d82704b20b8b38d3eb874afd865b349cbc1a48/DeviceDriverSet.cpp): HIGH/LOW direction control and standby behavior.
 - [`MotionControl.cpp`](https://github.com/elegooofficial/ELEGOO-Smart-Robot-Car-Kit-V4.0-New/blob/76d82704b20b8b38d3eb874afd865b349cbc1a48/MotionControl.cpp): paired left/right motor convention.
 
-The upstream snapshot has no top-level license granting wholesale redistribution. This repo does not vendor its AVR implementation or bundled third-party headers. It contains newly written software referencing the factual pin assignments and behavior above. Ownership/licensing of the original ELEGOO code is not claimed here.
+The upstream snapshot has no top-level license granting wholesale redistribution. This repo does not vendor its AVR implementation or bundled third-party headers. It contains newly written software referencing the original paired-drive behavior and retained servo/sonar pins. The current motor interface is the new L298N map in WIRING.md; shield standby D3 is not used. Ownership/licensing of the original ELEGOO code is not claimed here.
 
 ## Official Arduino sources
 
@@ -32,3 +32,11 @@ No Arduino library source is copied into this repo. App Lab and CLI obtain depen
 [Vosk models](https://alphacephei.com/vosk/models) and [Vosk API](https://github.com/alphacep/vosk-api): small English model and grammar-limited offline recognition. Model `vosk-model-small-en-us-0.15` and Vosk API are Apache-2.0. Downloaded model/license files remain in its folder and are included in a local App ZIP.
 
 OpenCV and NumPy/Pillow are provided by the App Lab environment. Test dependencies are installed separately. The default Arduino model services distribute their own model artifacts and licenses; this repository does not embed them. See [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
+
+## Current hardware sources
+
+- [ST L298 datasheet](https://www.st.com/resource/en/datasheet/l298.pdf): separate direction/enable inputs, 2.3 V minimum HIGH, logic 5 V supply, output-current and saturation-voltage specifications. Third-party board jumper/regulator behavior must still be verified.
+- [User-selected L298N two-pack](https://www.amazon.com/dp/B0CR6BX5QL): WWZMDiB, ASIN B0CR6BX5QL, resolved from https://a.co/d/00UPOao3.
+- [TI SN74AHCT125 datasheet](https://www.ti.com/lit/ds/symlink/sn74ahct125.pdf): 5 V buffer with TTL-compatible inputs and package pinout.
+- [ELEGOO V4 product specifications](https://eu.elegoo.com/products/elegoo-smart-robot-car-kit-v-4-0): 7.4 V, 2000 mAh lithium pack, 7.2–8.4 V listed operation, USB charging/protection; no published maximum discharge current or protection thresholds found.
+- [ELEGOO UNO R3 Super Starter Kit](https://us.elegoo.com/products/elegoo-uno-r3-super-starter-kit): reusable resistors, pushbuttons, breadboard and jumper wires. Check actual kit revision/contents; MAKE package contents are not assumed.

@@ -1,13 +1,14 @@
 # Commissioning — complete on the actual car
 
-No physical-board measurements were available when this project was written. Record your board/image versions, shield revision, camera/microphone models and measurements in a local copy of this checklist.
+No physical-board measurements were available when this project was written. Record your board/image versions, L298N module revision/labels, camera/microphone models and measurements in a local copy of this checklist.
 
 ## 1. Unpowered inspection
 
-- Remove/disconnect the old UNO, ESP camera, line tracker, IR/RGB/IMU and battery-ADC signal.
-- Confirm the shield matches the upstream D3/D5/D6/D7/D8 motor map.
-- Check polarity, fuse, motor-power disconnect, common ground, and isolation of Q/servo/shield positive rails.
-- Check each AHCT channel, OE, input pull-down and decoupling connection.
+- Remove/disconnect the old UNO, ELEGOO shield, ESP camera, line tracker, IR/RGB/IMU and battery-ADC signal.
+- Verify the exact new D4–D9 L298N signal map in WIRING.md, one module per side and one output channel per motor.
+- Remove ENA/ENB jumpers on both modules and fit a pull-down at each enable. Remove regulator-enable jumpers and verify externally supplied logic 5 V is an input.
+- Check polarity, fuse, motor-power disconnect, common ground, and correct separation of battery motor supply and bank electronics supply.
+- Check each AHCT channel, OE, decoupling connection.
 - Check echo divider and confirm there is no parallel raw-echo connection.
 - Mount camera and sonar together. Check centre alignment, servo torque and cable clearance.
 
@@ -16,10 +17,11 @@ No physical-board measurements were available when this project was written. Rec
 Have a meter and, for PWM/echo, preferably an oscilloscope or logic analyzer.
 
 - Verify Q power is stable with camera/mic and AI active; check actual total current against the source/hub rating.
-- Verify the shield logic rail and servo supply before inserting interface signal leads.
+- Verify bank simultaneous-port ratings and voltage stability with Q AI/camera active and servo moving. Connecting peripheral USB power must not reset the Q.
+- Verify both L298N logic 5 V inputs and the servo supply before inserting signal leads. Do not use onboard driver regulators for Q or servo.
 - Measure echo after the divider at approximately 3 V peak for a 5 V source; check for overvoltage and unintended backfeeding.
-- Confirm shield STBY is low while Q resets, app is absent, app is stopped and firmware is initially booted.
-- Verify the NC emergency contact reads low when released and high when pressed or unplugged. The motor-power contact must independently disconnect battery power.
+- Confirm all four enables are LOW while Q resets, app is absent, app is stopped and firmware is initially booted. A remaining enable jumper is a failed check.
+- Verify the default pushbutton reads HIGH released and LOW pressed. Pressing must prevent arming. In optional NC mode only, released is LOW and pressed/unplugged is HIGH. Verify the motor-power switch independently disconnects both driver motor supplies.
 - Run `scripts/bench_check.py` inside the App Lab Python environment, or temporarily use its body in a separate disarmed app. It never arms or moves motors. Do not run a competing Bridge controller while AICar is driving.
 - Check distance against a flat board at 200, 350 and 1000 mm. Remove the sonar: `distance_mm` must become -1 / unavailable. Timeouts must never become a 4000 mm “clear” reading.
 
@@ -27,11 +29,12 @@ Have a meter and, for PWM/echo, preferably an oscilloscope or logic analyzer.
 
 Secure the chassis so no wheel can touch a person, table, cable or loose object. Keep the physical motor-power disconnect in reach. Use a stationary flat board roughly 1 metre ahead for valid sonar. Use the normal voice commands rather than bypassing the firmware envelope.
 
-- Say Hey Arduino, AutoPilot. Confirm both motor pairs drive forward with a clear path. Wrong polarity: power off and fix the wiring/polarity constants.
+- Say Hey Arduino, AutoPilot. Confirm both motor pairs drive forward with a clear path. Wrong polarity: power off and fix individual motor leads or entire-side polarity constants. Verify every wheel points forward, since mirrored mounting can reverse one motor.
 - Introduce a flat obstacle at 350 mm. Translation must stop. Scans occur only with wheels stationary; verify 125° actually faces left, 55° right, and 90° forward. Swap the left/right config angles if needed.
 - Check bounded left and right pivots; the sign convention is positive left / negative right for a right turn. No full reverse command is accepted.
 - Say Hey Arduino, Stop with motors running. The mode must stay stopped through target/camera activity. Test noise and microphone placement; do not rely on speech as the emergency power cut.
-- Press or unplug the NC contact while running. Motors must stop and disarm; release must not resume. Select a new mode only after correcting the cause.
+- Press the kit stop button while running. Motors must stop/disarm; release must not resume. In optional NC mode, also unplug the contact and verify stopping. An unplugged default normally-open button is NOT detected. Select a new mode only after correcting the cause.
+- Check driver temperature, individual motor current and coast stopping distance. The L298N chip's current limit is not a promise that these modules support a motor's stall load.
 - Use the independent rated power switch: motors must lose power even if software is unresponsive.
 
 ## 4. Failure injection
@@ -47,7 +50,7 @@ Measure behavior, not just log messages. Record observed stop latency using vide
 | Pan away from forward | No motor motion during panning or settling |
 | Break Bridge connectivity | Host requests Stop when possible; MCU lease expires independently |
 | Release emergency stop | No automatic rearm |
-| Reset Q while motor shield remains powered | Standby pull-down keeps motors disabled during startup; verify physically |
+| Reset Q while L298N modules remain powered | Enable pull-downs keep all four channels disabled during startup; verify physically |
 
 A firmware hang is outside the command-lease mechanism. Demonstrate that the physical motor-power cut works independently; software tests cannot prove this hardware function.
 
@@ -72,9 +75,10 @@ Observe AutoPilot in a simple obstacle arrangement. It should stop before scans,
 Record:
 
 - Q image, App Lab/Python/Brick/core/library versions;
-- shield revision and verified input/power labels;
-- camera and microphone device names;
-- measured Q+peripheral current and peak echo voltage;
+- L298N module revision/labels and verified input/power labels;
+- power bank/hub model and simultaneous-port ratings;
+- camera and built-in microphone device names;
+- measured Q+peripheral current, motor current/driver temperature and peak echo voltage;
 - forward PWM, motor polarity, physical servo angles;
 - memory available with both AI services and Vosk loaded;
 - capture/inference latency and observed software/physical stop latency;

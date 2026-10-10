@@ -4,7 +4,7 @@
 
 Install Arduino App Lab using Arduino's [UNO Q getting-started documentation](https://docs.arduino.cc/tutorials/uno-q/user-manual/). Update the board through its supported App Lab flow. This repo targets **Arduino Zephyr core 1.0.0**, **Arduino_RouterBridge 0.4.3** and **Arduino_HardwareServo 0.0.1**, with dependencies pinned in `sketch/sketch.yaml`. An older image/core may need an update before these libraries work.
 
-Connect the Q-compatible powered USB-C host hub, camera and microphone. In normal computer-connected USB device mode the Q cannot simultaneously use the same port as a camera host; use the supported hub/SBC arrangement and App Lab **network mode** for development. The microphone is external; this build does not assume an onboard microphone. Power motors off for setup.
+Check the power bank and hub ratings in [WIRING.md](WIRING.md), then connect the Q-compatible USB-C host hub and webcam. This build expects the webcam's built-in microphone to enumerate as a USB audio input; no separate mic is needed if it does. In normal computer-connected USB device mode the Q cannot simultaneously use the same port as a camera host; use the supported hub/SBC arrangement and App Lab **network mode** for development. The microphone is in the USB webcam; this build does not assume an onboard Q microphone. Power motors off for setup.
 
 Run Arduino's **Hey Arduino!** example and object-detection example separately first. Confirm the microphone hears you and the UVC camera works. The examples and Bricks are listed in [Arduino's App Lab component repositories](https://support.arduino.cc/hc/en-us/articles/24358702846748-Code-repositories-for-Arduino-App-Lab-components).
 
@@ -33,11 +33,11 @@ Check:
 - Keyword Spotting uses the default **`hey_arduino`** 16 kHz mono model. A different keyword/model requires changing the voice adapter and sample configuration.
 - `sketch/sketch.yaml` contains the UNO Q build profile and the complete library list. App Lab versions may manage libraries through their UI instead of honoring every CLI profile field; add the listed versions there when needed.
 
-`python/config.json` defaults to `usb:0` camera and microphone `"0"`. Use App Lab's Python environment/device tools to list your actual USB peripherals; Linux device numbering can change with plug order. For the mic, Arduino's `ALSAMicrophone.list_devices()` can be used after importing it from `arduino.app_peripherals.microphone`; a stable ALSA name such as `plughw:CARD=YourMic,DEV=0` is preferable once known. Use a current App Lab image with the `Camera("usb:0", ...)` and `Microphone(...)` APIs referenced in [UPSTREAM.md](UPSTREAM.md). Config changes require restarting the app.
+`python/config.json` defaults to `usb:0` camera and microphone `"0"`. Use App Lab's Python environment/device tools to list your actual USB peripherals; Linux device numbering can change with plug order. For the mic, Arduino's `ALSAMicrophone.list_devices()` can be used after importing it from `arduino.app_peripherals.microphone`; Select the webcam's audio capture device, not its video device number; these enumerate independently. A stable ALSA name such as `plughw:CARD=YourMic,DEV=0` is preferable once known. Use a current App Lab image with the `Camera("usb:0", ...)` and `Microphone(...)` APIs referenced in [UPSTREAM.md](UPSTREAM.md). Config changes require restarting the app.
 
 ## 4. Run with the wheels raised
 
-Follow [WIRING.md](WIRING.md), then [COMMISSIONING.md](COMMISSIONING.md). Leave motor power disconnected initially. Click **Run** in App Lab to compile/upload the MCU sketch and start Python plus the model services. No separate AVR sketch upload is needed. The App monitor should report mode `Stop` and MCU `armed: false`.
+Follow the new [L298N wiring map](WIRING.md), then [COMMISSIONING.md](COMMISSIONING.md). Remove both boards' ENA/ENB jumpers and regulator-enable jumpers as documented, wire the enable pull-downs, and connect a normally-open pushbutton D2→GND. For an optional NC contact, change `STOP_CONTACT_NC` in the sketch before flashing. Never use the old shield harness with this firmware. Leave motor power disconnected initially. Click **Run** in App Lab to compile/upload the MCU sketch and start Python plus the model services. Only the Q is flashed. The original R3/shield are not connected and no USB-serial control adapter is used. The App monitor should report mode `Stop` and MCU `armed: false`.
 
 If the voice model or any initialization dependency is absent, the app stops with an explicit error and the MCU stays disarmed. If camera or audio processing fails after startup, a fault returns to Stop. The firmware independently stops on a missing control lease.
 
@@ -64,4 +64,4 @@ The pinned profile downloads its board core and dependencies. Firmware targets `
 
 ## Power down
 
-Say Stop, confirm `armed: false`, disconnect motor power, stop the app, and shut down Linux through the supported board workflow before removing the Q supply. Do not change the shield harness while any rail is live.
+Say Stop, confirm `armed: false`, disconnect motor power, stop the app, and shut down Linux through the supported board workflow before removing the Q supply. Do not change the L298N/peripheral wiring while any rail is live.

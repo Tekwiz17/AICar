@@ -1,4 +1,4 @@
-/* AICar: UNO Q only. ELEGOO V4 pin map / direction convention preserved.
+/* AICar: UNO Q only, two L298N modules, four original ELEGOO motors.
  * New implementation; see docs/UPSTREAM.md for reference provenance.
  */
 #include <Arduino.h>
@@ -6,11 +6,22 @@
 #include <Arduino_HardwareServo.h>
 #include <zephyr/kernel.h>
 #include "Safety.h"
+#include "L298N.h"
 
-constexpr int PWM_RIGHT = D5, PWM_LEFT = D6, DIR_RIGHT = D7, DIR_LEFT = D8;
-constexpr int STBY = D3, PAN = D10, TRIG = D13, ECHO = D12, ESTOP = D2;
-// NC emergency switch: D2 to GND when released; HIGH means pressed/unplugged.
+constexpr int PWM_RIGHT = D5, PWM_LEFT = D6;
+constexpr int RIGHT_IN1 = D7, RIGHT_IN2 = D4, LEFT_IN1 = D8, LEFT_IN2 = D9;
+constexpr int PAN = D10, TRIG = D13, ECHO = D12, ESTOP = D2;
+constexpr bool STOP_CONTACT_NC = false;
+// Default kit button: pressing closes D2 to GND. Release never rearms.
 constexpr bool LEFT_FORWARD_HIGH = true, RIGHT_FORWARD_HIGH = true;
+struct MotorIO {
+  static void output(int pin) { pinMode(pin, OUTPUT); }
+  static void digital(int pin, bool high) { digitalWrite(pin, high ? HIGH : LOW); }
+  static void pwm(int pin, int value) { analogWrite(pin, value); }
+  static void pause(unsigned us) { delayMicroseconds(us); }
+};
+L298N::Side<MotorIO> leftMotor(PWM_LEFT, LEFT_IN1, LEFT_IN2, LEFT_FORWARD_HIGH);
+L298N::Side<MotorIO> rightMotor(PWM_RIGHT, RIGHT_IN1, RIGHT_IN2, RIGHT_FORWARD_HIGH);
 K_MUTEX_DEFINE(stateMutex);
 HardwareServo panServo;
 struct Shared {
@@ -22,9 +33,12 @@ struct Shared {
 } state;
 
 void motorStop() {
-  analogWrite(PWM_RIGHT, 0);
-  analogWrite(PWM_LEFT, 0);
-  digitalWrite(STBY, LOW);
+  rightMotor.stop();
+  leftMotor.stop();
+}
+
+bool physicalStopPressed() {
+  return L298N::stopRequested(digitalRead(ESTOP) == HIGH, STOP_CONTACT_NC);
 }
 
 bool stop_car() {
@@ -32,15 +46,17 @@ bool stop_car() {
   state.armed = false;
   state.left = state.right = 0;
   state.fault = "stopped";
+  motorStop();
   k_mutex_unlock(&stateMutex);
   return true;
 }
 
 bool arm_car() {
   k_mutex_lock(&stateMutex, K_FOREVER);
-  bool ok = digitalRead(ESTOP) == LOW && state.servoOK;
+  bool ok = !physicalStopPressed() && state.servoOK;
   state.armed = ok;
   state.left = state.right = 0;
+  motorStop();
   state.commandAt = millis();
   state.fault = ok ? "armed" : "estop_or_servo";
   k_mutex_unlock(&stateMutex);
@@ -61,6 +77,7 @@ bool drive_car(int left, int right, int pan) {
     state.armed = false;
     state.left = state.right = 0;
     state.fault = "invalid_command";
+    motorStop();
   }
   k_mutex_unlock(&stateMutex);
   return valid;
@@ -81,11 +98,9 @@ String car_status() {
 }
 
 void setup() {
-  pinMode(STBY, OUTPUT);
-  digitalWrite(STBY, LOW);
-  pinMode(PWM_RIGHT, OUTPUT); pinMode(PWM_LEFT, OUTPUT);
-  pinMode(DIR_RIGHT, OUTPUT); pinMode(DIR_LEFT, OUTPUT);
-  motorStop();
+  // External enable pull-downs keep all four channels off before setup runs.
+  leftMotor.begin();
+  rightMotor.begin();
   pinMode(ESTOP, INPUT_PULLUP);
   pinMode(TRIG, OUTPUT); digitalWrite(TRIG, LOW);
   pinMode(ECHO, INPUT);  // 5 V echo MUST pass through the divider in the wiring guide.
@@ -103,7 +118,7 @@ void loop() {
   static uint32_t lastPing = 0;
   k_mutex_lock(&stateMutex, K_FOREVER);
   uint32_t now = millis();
-  state.estop = digitalRead(ESTOP) != LOW;
+  state.estop = physicalStopPressed();
   if (state.estop || (state.armed && now - state.commandAt > Safety::COMMAND_TIMEOUT_MS)) {
     state.armed = false;
     state.left = state.right = 0;
@@ -120,16 +135,9 @@ void loop() {
     now - state.commandAt, state.distance, now - state.rangeAt,
     state.actualPan, now - state.panAt, state.left, state.right);
   if (allowed && (state.left || state.right)) {
-    // Drop PWM before direction changes to avoid instant powered reversal.
-    static int previousLeft = 0, previousRight = 0;
-    if ((state.left > 0) != (previousLeft > 0) ||
-        (state.right > 0) != (previousRight > 0)) motorStop();
-    digitalWrite(DIR_LEFT, (state.left >= 0) == LEFT_FORWARD_HIGH ? HIGH : LOW);
-    digitalWrite(DIR_RIGHT, (state.right >= 0) == RIGHT_FORWARD_HIGH ? HIGH : LOW);
-    digitalWrite(STBY, HIGH);
-    analogWrite(PWM_LEFT, abs(state.left));
-    analogWrite(PWM_RIGHT, abs(state.right));
-    previousLeft = state.left; previousRight = state.right;
+    // Driver drops PWM and inserts dead time before a powered direction reversal.
+    leftMotor.drive(state.left);
+    rightMotor.drive(state.right);
     state.fault = "running";
   } else {
     motorStop();

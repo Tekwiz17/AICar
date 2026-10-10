@@ -16,6 +16,7 @@ jobs:
       - run: PYTHONPATH=python python -m unittest discover -s tests -v
       - run: python -m compileall -q python scripts
       - run: g++ -std=c++17 tests/safety_test.cpp -o /tmp/safety && /tmp/safety
+      - run: g++ -std=c++17 tests/motor_driver_test.cpp -o /tmp/motor-driver && /tmp/motor-driver
   firmware:
     runs-on: ubuntu-latest
     steps:

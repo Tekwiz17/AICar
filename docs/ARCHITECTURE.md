@@ -3,7 +3,7 @@
 ```mermaid
 flowchart LR
     Camera[USB camera on pan mount] --> Vision[Small object detection model + appearance lock]
-    Mic[USB microphone] --> Wake[Arduino Hey Arduino model]
+    Mic[Webcam USB microphone] --> Wake[Arduino Hey Arduino model]
     Mic --> Speech[Small offline Vosk grammar]
     Wake --> Gate[4 second voice gate]
     Speech --> Gate
@@ -11,15 +11,15 @@ flowchart LR
     Vision --> Control[Linux controller]
     Mode --> Control
     Control <-->|Router Bridge RPC| MCU[UNO Q Zephyr microcontroller]
-    MCU --> Motors[ELEGOO shield: left and right motor pairs]
+    MCU --> Motors[Two L298N modules: one channel per motor]
     MCU --> Pan[Camera + sonar pan servo]
     Sonar[Ultrasonic sensor] --> MCU
-    Switch[NC emergency contact] --> MCU
+    Switch[Kit stop pushbutton on D2] --> MCU
 ```
 
 ## Independent motor envelope
 
-The MCU starts disarmed, lowers standby before starting Bridge, and does not wait for a Serial Monitor to attach. Its loop maintains the pins; Bridge handlers only update mutex-protected desired state. It rejects out-of-range commands, full reverse, stale commands, stale/no echo, movement while sensors are panned away or settling, and emergency-switch faults.
+The MCU starts disarmed, disables PWM enables and neutralizes direction inputs before starting Bridge, and does not wait for a Serial Monitor to attach. Its loop maintains the pins; Bridge handlers update mutex-protected desired state and disable outputs immediately when stopping, rearming or rejecting an invalid command. It rejects out-of-range commands, full reverse, stale commands, stale/no echo, movement while sensors are panned away or settling, and physical stop inputs.
 
 - Host command lease: 500 ms; one bounded 25 ms ultrasonic read and loop/scheduling overhead can add to response time. This is not a measured safety certification.
 - Maximum absolute PWM: 110/255. Defaults: cruise 85, follow 70, turn 70.
@@ -29,7 +29,13 @@ The MCU starts disarmed, lowers standby before starting Bridge, and does not wai
 - Translation requires >300 mm; pivots require >180 mm. Host normally stops translation earlier at 350 mm.
 - Emergency switch or command expiry disarms. Clearing the fault does not automatically arm; a new mode selection is required.
 
-This is a motion-command lease, not a hardware MCU watchdog reset. If firmware/MCU itself hangs while outputs remain asserted, only a separate motor-power cut guarantees a stop. `stop_car` is applied on the next loop pass, not hardwired to the switch. A normally-closed contact detects an open wire; it does not detect a wire shorted to ground.
+This is a motion-command lease, not a hardware MCU watchdog reset. If firmware/MCU itself hangs while outputs remain asserted, only a separate motor-power cut guarantees a stop. `stop_car` disables outputs under the shared mutex immediately; the button is polled each loop, not hardwired to the power supply. The default kit pushbutton is pressed LOW and does not detect an unplugged wire. Optional NC mode detects an open wire, but not a wire shorted to ground. Neither switch replaces a motor-supply disconnect.
+
+## L298N output and power interface
+
+Each module controls one side: IN1/IN3 and IN2/IN4 share that side's direction signals, ENA/ENB share PWM, and each motor has a separate output pair. `L298N.h` neutralizes direction inputs on stop and removes PWM for 200 µs before reversing a powered side. There is no standby pin. The four hardware enable pull-downs hold outputs disabled before firmware runs; remove all four enable jumpers. Zero commands coast rather than actively brake. Actual coast stopping distance must be measured.
+
+The low-purchase power plan separates the motor battery from a USB power bank feeding Q and a separately wired 5 V peripheral branch. It requires checking the actual bank/hub/servo current ratings. Linux and MCU cannot detect an inadequate power bank, disconnected stop button, hot driver or low motor battery with the current sensors. Detailed connections are in [WIRING.md](WIRING.md).
 
 ## AutoPilot
 
